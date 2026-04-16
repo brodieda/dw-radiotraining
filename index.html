@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DanceWize NSW — Radio Call Simulation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f4f0;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 1.5rem 1rem;
+  }
+
+  .wrap { max-width: 680px; margin: 0 auto; }
+
+  .hdr {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .hdr-title { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .cs-chip {
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+    border-radius: 8px; background: #dbeafe; color: #1e40af;
+    border: 0.5px solid #93c5fd;
+  }
+  .score-lbl { font-size: 13px; color: #6b7280; margin-left: auto; }
+  .mute-btn {
+    display: flex; align-items: center; gap: 5px;
+    background: #ffffff; border: 1px solid #d1d5db;
+    border-radius: 8px; padding: 4px 10px; font-size: 12px;
+    color: #374151; cursor: pointer; font-family: inherit;
+    transition: background 0.1s; flex-shrink: 0;
+  }
+  .mute-btn:hover { background: #f3f4f6; }
+  .mute-btn.muted { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+  .prog { height: 3px; background: #e5e7eb; border-radius: 2px; margin-bottom: 1rem; }
+  .prog-fill { height: 100%; background: #378ADD; border-radius: 2px; transition: width 0.4s; }
+
+  .log-panel {
+    background: #0a0a0a; border-radius: 12px; padding: 1rem;
+    min-height: 320px; max-height: 520px; overflow-y: auto;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12.5px; line-height: 1.85; margin-bottom: 1rem;
+  }
+  .log-panel::-webkit-scrollbar { width: 4px; }
+  .log-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  .ll           { margin-bottom: 3px; word-break: break-word; }
+  .ll-sys       { color: #4b5563; font-style: italic; }
+  .ll-ecc       { color: #60a5fa; }
+  .ll-you       { color: #22c55e; }
+  .ll-you-wrong { color: #f87171; }
+
+  .sit-box  { border:1px solid #7c3aed; border-radius:6px; padding:8px 10px; margin:6px 0; color:#c4b5fd; background:rgba(124,58,237,0.08); }
+  .q-box    { border:1px solid #d97706; border-radius:6px; padding:8px 10px; margin:6px 0; color:#fbbf24; background:rgba(217,119,6,0.08); }
+  .fb-box-ok{ border:1px solid #059669; border-radius:6px; padding:8px 10px; margin:6px 0; color:#34d399; background:rgba(5,150,105,0.1); }
+  .fb-box-bad{ border:1px solid #dc2626; border-radius:6px; padding:8px 10px; margin:6px 0; color:#f87171; background:rgba(220,38,38,0.1); }
+  .tip-box  { border:1px solid #0891b2; border-radius:6px; padding:8px 10px; margin:6px 0; color:#67e8f9; background:rgba(8,145,178,0.1); }
+
+  .glitch-line { color:#f87171; font-family:"Courier New",Courier,monospace; font-size:12.5px; margin-bottom:3px; word-break:break-word; }
+
+  .cursor { display:inline-block; width:6px; height:12px; background:#22c55e; margin-left:1px; vertical-align:middle; animation:blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .opts-area { margin-bottom: 1rem; }
+  .opt {
+    display:block; width:100%; background:#ffffff; border:1.5px solid #d1d5db;
+    border-radius:8px; padding:10px 13px; font-size:13px; color:#1a1a1a;
+    cursor:pointer; text-align:left; line-height:1.45; margin-bottom:7px;
+    transition:background 0.1s, border-color 0.1s;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  .opt:last-child { margin-bottom: 0; }
+  .opt:hover:not(:disabled) { background:#f3f4f6; border-color:#9ca3af; }
+  .opt.selected   { background:#eff6ff; border-color:#3b82f6; color:#1e40af; font-weight:500; }
+  .opt.correct    { background:#f0fdf4; border-color:#16a34a; color:#15803d; font-weight:500; }
+  .opt.wrong      { background:#fef2f2; border-color:#dc2626; color:#b91c1c; font-weight:500; }
+  .opt.wrong-used { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; opacity:0.45; cursor:default; }
+  .opt:disabled   { cursor:default; }
+
+  .mic-section { background:#ffffff; border:0.5px solid #e5e7eb; border-radius:12px; padding:1rem; }
+  .mic-instruction {
+    background:#fefce8; border:1px solid #fde68a; border-radius:8px;
+    padding:10px 12px; margin-bottom:1rem; font-size:12px; color:#92400e; line-height:1.6;
+  }
+  .mic-instruction strong { display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#78350f; margin-bottom:4px; }
+  .mic-steps { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center; }
+  .mic-step  { display:flex; align-items:center; gap:5px; font-size:11px; color:#92400e; }
+  .mic-step-num {
+    width:18px; height:18px; border-radius:50%; background:#fde68a;
+    border:1px solid #f59e0b; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; color:#78350f; flex-shrink:0;
+  }
+  .mic-step-arrow { color:#d97706; font-size:13px; margin:0 2px; }
+
+  .mic-row { display:flex; align-items:center; gap:16px; }
+  .mic-btn {
+    width:64px; height:64px; border-radius:50%; border:2px solid #d1d5db;
+    background:#ffffff; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; transition:background 0.1s, border-color 0.1s;
+    flex-shrink:0; user-select:none; -webkit-user-select:none;
+  }
+  .mic-btn.pulse   { background:#fee2e2; border-color:#ef4444; animation:pulseAnim 1s ease-in-out infinite; }
+  .mic-btn.waiting { background:#fef3c7; border-color:#f59e0b; animation:none; }
+  .mic-btn.rxing   { background:#dbeafe; border-color:#3b82f6; animation:none; }
+  .mic-btn:disabled { opacity:0.35; cursor:default; animation:none; }
+  @keyframes pulseAnim { 0%,100%{transform:scale(1)} 50%{transform:scale(0.93)} }
+
+  .mic-info  { display:flex; flex-direction:column; gap:4px; }
+  .dot-row   { display:flex; align-items:center; gap:6px; }
+  .dot       { width:8px; height:8px; border-radius:50%; background:#9ca3af; transition:background 0.15s; flex-shrink:0; }
+  .dot.tx    { background:#22c55e; }
+  .dot.rx    { background:#60a5fa; }
+  .mic-status { font-size:13px; font-weight:600; color:#1a1a1a; }
+  .mic-hint   { font-size:12px; color:#6b7280; line-height:1.4; }
+
+  .complete { background:#f0fdf4; border:1px solid #86efac; border-radius:12px; padding:1.5rem; text-align:center; margin-bottom:1rem; }
+  .complete-score { font-size:34px; font-weight:700; color:#15803d; margin-bottom:4px; }
+  .complete-msg   { font-size:14px; color:#166534; margin-bottom:1rem; }
+  .next-btn {
+    background:#ffffff; border:1px solid #d1d5db; border-radius:8px;
+    padding:8px 18px; font-size:13px; cursor:pointer; color:#1a1a1a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  .next-btn:hover { background:#f3f4f6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="hdr-title">Radio simulation</div>
+    <div class="cs-chip">Team Alpha</div>
+    <div class="score-lbl" id="scoreLbl">0 / 0</div>
+    <button class="mute-btn" id="muteBtn" onclick="toggleMute()">
+      <span id="muteIcon">🔊</span>
+      <span id="muteTxt">Sound on</span>
+    </button>
+  </div>
+  <div class="prog"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+
+  <div class="log-panel" id="logPanel">
+    <div id="logLines"></div>
+  </div>
+
+  <div class="opts-area" id="optsArea" style="display:none"></div>
+  <div id="completeArea"></div>
+
+  <div class="mic-section">
+    <div class="mic-instruction">
+      <strong>How to use the mic button</strong>
+      In real radio use, you press and hold the PTT (push-to-talk) button while speaking, then release when finished. This simulation mirrors that flow. If ECC asks you to correct your call, press the mic and try again with the remaining options.
+      <div class="mic-steps">
+        <div class="mic-step"><div class="mic-step-num">1</div> Press mic to open channel</div>
+        <div class="mic-step-arrow">›</div>
+        <div class="mic-step"><div class="mic-step-num">2</div> Select your call below</div>
+        <div class="mic-step-arrow">›</div>
+        <div class="mic-step"><div class="mic-step-num">3</div> Press mic again to release — listen for ECC</div>
+      </div>
+    </div>
+    <div class="mic-row">
+      <button class="mic-btn" id="micBtn" onclick="onMicClick()">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <rect x="9" y="2" width="8" height="14" rx="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M5 13c0 4.418 3.582 8 8 8s8-3.582 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="13" y1="21" x2="13" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="9" y1="25" x2="17" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="mic-info">
+        <div class="dot-row">
+          <div class="dot" id="dot"></div>
+          <div class="mic-status" id="micStatus">Stand by</div>
+        </div>
+        <div class="mic-hint" id="micHint">Press mic when ready to make your first call</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── TTS (ECC only) ──────────────────────────────────── */
+var muted = false;
+var eccVoice = null;
+
+function toggleMute() {
+  muted = !muted;
+  document.getElementById('muteIcon').textContent = muted ? '🔇' : '🔊';
+  document.getElementById('muteTxt').textContent   = muted ? 'Sound off' : 'Sound on';
+  document.getElementById('muteBtn').className = 'mute-btn' + (muted ? ' muted' : '');
+  if (muted) stopSpeech();
+}
+
+function loadVoices() {
+  var voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  var en = voices.filter(function(v){ return v.lang.startsWith('en'); });
+  eccVoice = en.find(function(v){ return /daniel|alex|fred|bruce|ralph|male/i.test(v.name); })
+          || en.find(function(v){ return v.lang === 'en-GB'; })
+          || en[0] || voices[0];
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+}
+
+function speakECC(text, callback) {
+  if (muted || !window.speechSynthesis) { if (callback) callback(); return; }
+  stopSpeech();
+  var u = new SpeechSynthesisUtterance(text);
+  u.voice  = eccVoice;
+  u.pitch  = 0.85;
+  u.rate   = 1.05;
+  u.volume = 1.0;
+  u.onend = u.onerror = function(){ if (callback) callback(); };
+  window.speechSynthesis.speak(u);
+}
+
+function stopSpeech() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+/* ── DATA ────────────────────────────────────────────── */
+var STEPS = [
+  {
+    situation: "You are Team Alpha, roving at stage left. You notice a patron who has fallen and appears unconscious. You approach — male, mid-20s, unconscious but breathing, not bleeding. You are at grid D4. You need to call for urgent medical assistance.",
+    question: "What is your first call?",
+    yourLine: "Alpha, to ECC.",
+    eccResponse: "Go for ECC.",
+    options: [
+      { text: "Alpha, to ECC.", correct: true },
+      { text: "ECC, this is Alpha — I have an emergency.", correct: false,
+        ecc: "Alpha, that is not correct radio protocol. Identify yourself first, then who you are calling. Try again." },
+      { text: "Break break break — Alpha to all units.", correct: false,
+        ecc: "Alpha, break break break is only for interrupting an active call in a genuine emergency. Use your standard opening call. Try again." },
+      { text: "Alpha calling medical team.", correct: false,
+        ecc: "Alpha, your first call should always go to ECC, not directly to medical. Try again." }
+    ],
+    feedback: "Correct. Always open with your own callsign first, then who you are calling."
+  },
+  {
+    situation: "ECC has responded. Now give your full patient report.",
+    question: "What do you say?",
+    yourLine: "We have located a patron in need of medical assistance. Patient is male, mid-20s. Unconscious, breathing, not bleeding. My location is grid D4.",
+    glitch: true,
+    glitchSource: "We have located a patron in need of medical assistance. Patient is male, mid-20s. Unconscious, breathing, not bleeding. My location is grid D4.",
+    glitchFollow: "Alpha, say again. Transmission did not come through.",
+    tip: "Speak calmly and clearly. Keep the radio roughly a hand's width from your mouth — too close and your voice distorts, too far and it drops out.",
+    repeatQuestion: "Repeat your transmission clearly.",
+    eccResponseAfter: "Copy Alpha. Raise your baton and standby for further instructions.",
+    options: [
+      { text: "We have located a patron in need of medical assistance. Patient is male, mid-20s. Unconscious, breathing, not bleeding. My location is grid D4.", correct: true },
+      { text: "I've got an unconscious male here at D4, he needs help now.", correct: false,
+        ecc: "Alpha, use the full report format — nature of need, sex, age, conscious state, breathing, bleeding, then your grid. Try again." },
+      { text: "PIC is male, 20s, unconscious. At D4, send medical.", correct: false,
+        ecc: "Alpha, incomplete report. I need the full patient status — nature of need, vitals, breathing, bleeding — before the grid. Try again." },
+      { text: "There's a patron down at grid D4, please send medical.", correct: false,
+        ecc: "Alpha, I need a full patient report before dispatching. Nature of need, sex, age, conscious state, breathing, bleeding, then grid. Try again." }
+    ],
+    feedback: "Correct. Full patient report: nature of need, sex, age, conscious state, breathing, bleeding, then grid."
+  },
+  {
+    situation: "You raise your baton. Medical is on the way. The patron's friend rushes over, demanding to know what is happening.",
+    question: "What do you do?",
+    isKnowledge: true,
+    options: [
+      { text: "Stay calm, reassure them help is coming, keep them nearby but give the patron space.", correct: true },
+      { text: "Tell them to leave the area immediately.", correct: false,
+        ecc: "Pushing bystanders away can escalate the situation and you may lose valuable information about the patron. Think about how to manage them calmly." },
+      { text: "Hand them the PIC form so they can fill in details.", correct: false,
+        ecc: "PIC forms are confidential and must never be handed to bystanders. Think about how to manage the friend calmly while keeping the patron safe." },
+      { text: "Ignore them and focus only on the patron.", correct: false,
+        ecc: "Ignoring a distressed bystander can escalate quickly and they may have important information about the patron. Try again." }
+    ],
+    feedback: "Correct. Keep bystanders calm and close — they may have useful information — but maintain space around the patron."
+  },
+  {
+    situation: "Medical has arrived and taken over care of the patron. They are escorting him to the medical tent.",
+    question: "What should Alpha do now?",
+    isKnowledge: true,
+    options: [
+      { text: "Walk alongside medical — out of their way — fill out a Rover PIC form, and hand over to medical if they need information.", correct: true },
+      { text: "Return immediately to patrol at stage left — medical has it covered.", correct: false,
+        ecc: "Your documentation responsibilities are not done yet. You need to complete a Rover PIC form while the details are fresh. Try again." },
+      { text: "Stay exactly where you are and wait for ECC instructions.", correct: false,
+        ecc: "The patron is being moved to the medical tent. You should go with them, stay out of the way, and complete your Rover PIC form. Try again." },
+      { text: "Ask medical to fill out the form — they have more information.", correct: false,
+        ecc: "The Rover PIC form is your responsibility, not medical's. You observed the scene first — complete it yourself while walking with them. Try again." }
+    ],
+    feedback: "Correct. Escort medical to the tent, stay out of their way, complete the Rover PIC form while walking, and be ready to hand over information if asked."
+  },
+  {
+    situation: "Medical has completed their handover. The scene is clear. You need to notify ECC.",
+    question: "What do you radio to ECC?",
+    yourLine: "Alpha, to ECC. Scene is clear, returning to patrol.",
+    eccResponse: "Copy Alpha. Head to the carespace break room for a debrief with the coordinator. Take a break if you need it — you've done great work tonight.",
+    options: [
+      { text: "Alpha, to ECC. Scene is clear, returning to patrol.", correct: true },
+      { text: "Alpha here — all good, heading back out.", correct: false,
+        ecc: "Alpha, use your full callsign format — callsign first, then who you are calling, then your message. Try again." },
+      { text: "ECC, Alpha. Medical has cleared, we're done.", correct: false,
+        ecc: "Alpha, identify yourself before calling me. Callsign first, then ECC, then your message. Try again." },
+      { text: "Alpha, signing off from grid D4.", correct: false,
+        ecc: "Alpha, do not sign off without a status update. Let me know the scene is clear and that you are returning to patrol. Try again." }
+    ],
+    feedback: "Good. Correct callsign format, clear status, intent stated."
+  },
+  {
+    situation: "Back on patrol 20 minutes later. You find a patron sitting alone and crying — conscious and responsive but clearly distressed. They want support. You decide to walk them to DW NSW Care Space.",
+    question: "What do you radio to ECC?",
+    yourLine: "Alpha, to ECC. We have located a patron in need of assistance. We are taking them to DW NSW Care Space.",
+    eccResponse: "Copy that Alpha.",
+    options: [
+      { text: "Alpha, to ECC. We have located a patron in need of assistance. We are taking them to DW NSW Care Space.", correct: true },
+      { text: "Alpha to ECC — Code 4, heading to carespace.", correct: false,
+        ecc: "Alpha, avoid codes on the radio unless instructed. Not everyone on channel will know them. Use plain language and the full script. Try again." },
+      { text: "ECC, Alpha. Patron needs support, coming in now.", correct: false,
+        ecc: "Alpha, identify yourself first, then call ECC. Also let me know you have located a patron and where you are taking them. Try again." },
+      { text: "Alpha — distressed patron, walking to carespace.", correct: false,
+        ecc: "Alpha, I need the full taking-PIC-to-carespace call. Callsign, to ECC, located a patron in need of assistance, taking them to the carespace. Try again." }
+    ],
+    feedback: "Correct. Full taking-PIC-to-carespace call with proper callsign format."
+  }
+];
+
+/* ── STATE ───────────────────────────────────────────── */
+var PHASE = { AWAITING_PRESS: 0, AWAITING_RELEASE: 1, ECC_RESPONDING: 2 };
+var phase = PHASE.AWAITING_PRESS;
+var cur = 0, score = 0, answered = 0;
+var optionsAnswered = false;
+var inRepeat = false;
+var firstAttempt = true;
+var selectedBtn = null;
+
+/* ── DOM ─────────────────────────────────────────────── */
+var micBtn     = document.getElementById('micBtn');
+var micStatus  = document.getElementById('micStatus');
+var micHint    = document.getElementById('micHint');
+var dot        = document.getElementById('dot');
+var logLines   = document.getElementById('logLines');
+var logPanel   = document.getElementById('logPanel');
+var optsArea   = document.getElementById('optsArea');
+var progFill   = document.getElementById('progFill');
+
+/* ── LOG HELPERS ─────────────────────────────────────── */
+function scrollLog() { logPanel.scrollTop = logPanel.scrollHeight; }
+
+function addLine(text, cls) {
+  var d = document.createElement('div');
+  d.className = 'll ' + cls; d.textContent = text;
+  logLines.appendChild(d); scrollLog(); return d;
+}
+
+function addBox(text, cls) {
+  var d = document.createElement('div');
+  d.className = cls; d.textContent = text;
+  logLines.appendChild(d); scrollLog(); return d;
+}
+
+
+/* ── MIC UI ──────────────────────────────────────────── */
+function setMic(statusText, hintText, dotCls, btnCls) {
+  micStatus.textContent = statusText;
+  micHint.textContent   = hintText;
+  dot.className    = 'dot'     + (dotCls ? ' ' + dotCls : '');
+  micBtn.className = 'mic-btn' + (btnCls ? ' ' + btnCls : '');
+}
+
+/* ── AUDIO ───────────────────────────────────────────── */
+function playBeep() {
+  if (muted) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 900; osc.type = 'sine';
+    gain.gain.setValueAtTime(0.22, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
+  } catch(e) {}
+}
+
+function playStatic() {
+  if (muted) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var buf = ctx.createBuffer(1, ctx.sampleRate * 0.09, ctx.sampleRate);
+    var d   = buf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.18;
+    var src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start();
+  } catch(e) {}
+}
+
+/* ── GLITCH ──────────────────────────────────────────── */
+function corruptText(text) {
+  var gc = '#@%!~?-*';
+  return text.split('').map(function(ch) {
+    if (ch === ' ') return ' ';
+    var r = Math.random();
+    if (r < 0.18) return gc[Math.floor(Math.random() * gc.length)];
+    if (r < 0.28) return '';
+    return ch;
+  }).join('');
+}
+
+function runGlitch(sourceText, follow, tip, onDone) {
+  var f = 0, el = addLine('', 'glitch-line');
+  function nextFrame() {
+    if (f < 6) {
+      el.textContent = corruptText(sourceText); scrollLog(); f++;
+      setTimeout(nextFrame, 120);
+    } else {
+      el.textContent = corruptText(sourceText).slice(0, Math.floor(sourceText.length * 0.55)) + '...';
+      scrollLog();
+      setTimeout(function() {
+        addLine('[ECC] ' + follow, 'll-ecc');
+        speakECC(follow, function() {
+          addBox('📡  ' + tip, 'tip-box');
+          scrollLog();
+          if (onDone) setTimeout(onDone, 600);
+        });
+      }, 500);
+    }
+  }
+  nextFrame();
+}
+
+/* ── LOAD STEP ───────────────────────────────────────── */
+function loadStep() {
+  optionsAnswered = false;
+  inRepeat        = false;
+  firstAttempt    = true;
+  selectedBtn     = null;
+  optsArea.style.display = 'none';
+  optsArea.innerHTML     = '';
+
+  var s = STEPS[cur];
+  progFill.style.width = (cur / STEPS.length * 100) + '%';
+  if (cur === 0) addLine('— session start —', 'll-sys');
+
+  addBox(s.situation, 'sit-box');
+
+  setTimeout(function() {
+    addBox('> ' + (s.question || 'What do you do?'), 'q-box');
+
+    if (s.isKnowledge) {
+      micBtn.disabled = true;
+      setMic('No transmission needed', 'Choose the correct action below', '', '');
+      phase = PHASE.AWAITING_RELEASE;
+      buildOptions(s);
+    } else {
+      micBtn.disabled = false;
+      phase = PHASE.AWAITING_PRESS;
+      setMic('Stand by', 'Press mic to begin your call', '', '');
+    }
+  }, 200);
+}
+
+/* ── BUILD OPTIONS ───────────────────────────────────── */
+function buildOptions(s) {
+  optsArea.innerHTML = '';
+  selectedBtn = null;
+  var shuffled = s.options.slice().sort(function(){ return Math.random() - 0.5; });
+  shuffled.forEach(function(opt) {
+    var btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt.text;
+    btn.dataset.correct = String(opt.correct);
+    btn.dataset.ecc     = opt.ecc || '';
+    btn.onclick = function(){ selectOpt(btn, opt.correct, s); };
+    optsArea.appendChild(btn);
+  });
+  optsArea.style.display = 'block';
+}
+
+function resetOptionsForRetry() {
+  // Re-enable non-used options, clear selection state
+  optsArea.querySelectorAll('.opt').forEach(function(b) {
+    if (!b.classList.contains('wrong-used')) {
+      b.disabled = false;
+      b.classList.remove('selected', 'wrong');
+    }
+  });
+  selectedBtn     = null;
+  optionsAnswered = false;
+  optsArea.style.display = 'block';
+}
+
+/* ── SELECT OPTION ───────────────────────────────────── */
+function selectOpt(el, correct, s) {
+  if (optionsAnswered) return;
+
+  optsArea.querySelectorAll('.opt').forEach(function(b) {
+    if (!b.classList.contains('wrong-used')) b.classList.remove('selected');
+  });
+  el.classList.add('selected');
+  selectedBtn     = el;
+  optionsAnswered = true;
+
+  /* Knowledge question — resolve immediately */
+  if (s.isKnowledge) {
+    el.classList.remove('selected');
+    if (correct) {
+      el.classList.add('correct');
+      if (firstAttempt) { score++; answered++; }
+      firstAttempt = false;
+      document.getElementById('scoreLbl').textContent = score + ' / ' + answered;
+      optsArea.querySelectorAll('.opt').forEach(function(b){ b.disabled = true; });
+      optsArea.style.display = 'none';
+      addBox(s.feedback, 'fb-box-ok');
+      speakECC(s.feedback, function() {
+        setTimeout(afterStep, 400);
+      });
+    } else {
+      playStatic();
+      if (firstAttempt) answered++;
+      firstAttempt = false;
+      document.getElementById('scoreLbl').textContent = score + ' / ' + answered;
+      var eccMsg = el.dataset.ecc || "Not quite. Try again.";
+      el.classList.add('wrong-used');
+      el.disabled = true;
+      addBox(eccMsg, 'fb-box-bad');
+      speakECC(eccMsg, function() {
+        optionsAnswered = false;
+        selectedBtn     = null;
+        optsArea.style.display = 'block';
+        setMic('No transmission needed', 'Choose the correct action below', '', '');
+      });
+    }
+    return;
+  }
+
+  /* Radio call — wait for release */
+  setMic('Transmitting...', 'Press mic to release PTT', 'tx', 'waiting');
+}
+
+/* ── MIC CLICK ───────────────────────────────────────── */
+function onMicClick() {
+  if (phase === PHASE.AWAITING_PRESS) {
+    phase = PHASE.AWAITING_RELEASE;
+    stopSpeech();
+    setMic('Transmitting...', 'Select your call below, then press mic again to release', 'tx', 'pulse');
+    if (!optsArea.hasChildNodes() || optsArea.innerHTML === '') {
+      buildOptions(STEPS[cur]);
+    } else {
+      resetOptionsForRetry();
+    }
+    return;
+  }
+  if (phase === PHASE.AWAITING_RELEASE) {
+    if (!optionsAnswered) {
+      micHint.textContent = 'Select your call first, then press to release';
+      return;
+    }
+    doRelease();
+  }
+}
+
+/* ── RELEASE ─────────────────────────────────────────── */
+function doRelease() {
+  if (phase !== PHASE.AWAITING_RELEASE) return;
+  phase = PHASE.ECC_RESPONDING;
+  stopSpeech();
+
+  var s       = STEPS[cur];
+  var correct = selectedBtn && selectedBtn.dataset.correct === 'true';
+  var eccMsg  = selectedBtn ? selectedBtn.dataset.ecc : '';
+
+  /* Log what was transmitted */
+  if (correct) {
+    addLine('[You] ' + s.yourLine, 'll-you');
+  } else {
+    addLine('[You] ' + (selectedBtn ? selectedBtn.textContent : ''), 'll-you-wrong');
+  }
+
+  setMic('Released', 'Awaiting response...', '', 'rxing');
+  playBeep();
+  optsArea.style.display = 'none';
+
+  /* ── Glitch path ── */
+  if (s.glitch && !inRepeat && correct) {
+    setTimeout(function() {
+      setMic('Receiving...', '', 'rx', 'rxing');
+      runGlitch(s.glitchSource, s.glitchFollow, s.tip, function() {
+        inRepeat        = true;
+        optionsAnswered = false;
+        selectedBtn     = null;
+        addBox('> ' + s.repeatQuestion, 'q-box');
+        /* Rebuild fresh options for the repeat */
+        buildOptions(s);
+        phase = PHASE.AWAITING_PRESS;
+        micBtn.disabled = false;
+        setMic('Stand by', 'Press mic to repeat your transmission', '', '');
+      });
+    }, 400);
+    return;
+  }
+
+  /* ── Wrong answer — ECC corrects, loop back ── */
+  if (!correct) {
+    playStatic();
+    if (firstAttempt) answered++;
+    firstAttempt = false;
+    document.getElementById('scoreLbl').textContent = score + ' / ' + answered;
+
+    /* Mark this option as permanently wrong */
+    if (selectedBtn) {
+      selectedBtn.classList.remove('selected', 'wrong');
+      selectedBtn.classList.add('wrong-used');
+      selectedBtn.disabled = true;
+    }
+
+    var correction = eccMsg || "Alpha, that is not correct. Try again.";
+    setTimeout(function() {
+      setMic('Receiving...', 'ECC is responding...', 'rx', 'rxing');
+      addLine('[ECC] ' + correction, 'll-ecc');
+      speakECC(correction, function() {
+        optionsAnswered = false;
+        selectedBtn     = null;
+        phase = PHASE.AWAITING_PRESS;
+        micBtn.disabled = false;
+        setMic('Stand by', 'Press mic to try again', '', '');
+        resetOptionsForRetry();
+      });
+    }, 400);
+    return;
+  }
+
+  /* ── Correct ── */
+  if (firstAttempt) { score++; answered++; }
+  firstAttempt = false;
+  document.getElementById('scoreLbl').textContent = score + ' / ' + answered;
+
+  optsArea.querySelectorAll('.opt').forEach(function(b){
+    b.disabled = true; b.classList.remove('selected', 'wrong-used');
+  });
+  if (selectedBtn) selectedBtn.classList.add('correct');
+
+  setTimeout(function() {
+    addBox(s.feedback, 'fb-box-ok');
+    var resp = s.eccResponseAfter || s.eccResponse;
+    if (resp) {
+      setMic('Receiving...', 'ECC is responding...', 'rx', 'rxing');
+      addLine('[ECC] ' + resp, 'll-ecc');
+      speakECC(resp, function() {
+        afterStep();
+      });
+    } else {
+      setTimeout(afterStep, 600);
+    }
+  }, 350);
+}
+
+/* ── AFTER STEP ──────────────────────────────────────── */
+function afterStep() {
+  cur++;
+  stopSpeech();
+  setMic('Stand by', '', '', '');
+  micBtn.disabled  = true;
+  micBtn.className = 'mic-btn';
+  if (cur >= STEPS.length) { showComplete(); return; }
+  progFill.style.width = (cur / STEPS.length * 100) + '%';
+  setTimeout(loadStep, 400);
+}
+
+/* ── COMPLETE ────────────────────────────────────────── */
+function showComplete() {
+  progFill.style.width = '100%';
+  addLine('— session complete —', 'll-sys');
+  micBtn.disabled = true;
+  setMic('Session complete', '', '', '');
+  var pct = Math.round(score / answered * 100);
+  var msg = pct === 100 ? 'Perfect — radio-ready!'
+          : pct >= 80   ? 'Great work, nearly there.'
+          :                "Keep practising — you'll get there.";
+  document.getElementById('completeArea').innerHTML =
+    '<div class="complete">' +
+    '<div class="complete-score">' + score + ' / ' + answered + '</div>' +
+    '<div class="complete-msg">' + msg + '</div>' +
+    '<button class="next-btn" onclick="restart()">Try again</button>' +
+    '</div>';
+}
+
+/* ── RESTART ─────────────────────────────────────────── */
+function restart() {
+  cur = 0; score = 0; answered = 0;
+  inRepeat = false; firstAttempt = true; selectedBtn = null;
+  stopSpeech();
+  logLines.innerHTML = '';
+  document.getElementById('completeArea').innerHTML = '';
+  optsArea.innerHTML = ''; optsArea.style.display = 'none';
+  document.getElementById('scoreLbl').textContent = '0 / 0';
+  progFill.style.width = '0%';
+  micBtn.disabled  = false;
+  micBtn.className = 'mic-btn';
+  loadStep();
+}
+
+loadStep();
+</script>
+</body>
+</html>
